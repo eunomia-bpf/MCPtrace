@@ -53,7 +53,8 @@ The server is built with FastMCP and provides four main tools:
 ### Security Considerations
 
 - Requires sudo access for bpftrace execution
-- Currently uses hardcoded password "123456" in server.py:169 (needs improvement for production)
+- Server prompts for sudo password at startup (cached for session)
+- Alternative: Configure passwordless sudo for bpftrace: `sudo visudo` then add `username ALL=(ALL) NOPASSWD: /usr/bin/bpftrace`
 - No script validation - relies on AI to generate safe bpftrace programs
 - Resource limits: 60s execution timeout, 10k line output buffer
 

@@ -14,11 +14,16 @@ import shlex
 import os
 import signal
 from contextlib import asynccontextmanager
+import getpass
+import sys
 
 from fastmcp import FastMCP
 
 # Global storage for execution buffers
 execution_buffers: Dict[str, 'ExecutionBuffer'] = {}
+
+# Global storage for sudo password (session-only)
+SUDO_PASSWORD: Optional[str] = None
 
 # Cleanup old buffers every 5 minutes
 BUFFER_CLEANUP_INTERVAL = 300
@@ -87,8 +92,8 @@ async def run_bpftrace_program(execution_id: str, program: str, timeout: int):
     buffer = execution_buffers[execution_id]
     
     try:
-        # Create the bpftrace command
-        cmd = ["sudo", "bpftrace", "-e", program]
+        # Create the bpftrace command with -S flag for reading password from stdin
+        cmd = ["sudo", "-S", "bpftrace", "-e", program]
         
         # Start the process
         process = await asyncio.create_subprocess_exec(
@@ -100,9 +105,11 @@ async def run_bpftrace_program(execution_id: str, program: str, timeout: int):
         
         buffer.process = process
         
-        # Send password to sudo if needed
-        process.stdin.write(b"123456\n")
-        await process.stdin.drain()
+        # Send password to sudo
+        if SUDO_PASSWORD:
+            process.stdin.write(f"{SUDO_PASSWORD}\n".encode())
+            await process.stdin.drain()
+            process.stdin.close()
         
         # Set up timeout
         timeout_task = asyncio.create_task(asyncio.sleep(timeout))
@@ -175,7 +182,7 @@ async def list_probes(filter: Optional[str] = None) -> Dict[str, Any]:
         Dictionary containing list of matching probes
     """
     try:
-        cmd = ["sudo", "bpftrace", "-l"]
+        cmd = ["sudo", "-S", "bpftrace", "-l"]
         if filter:
             cmd.append(filter)
             
@@ -186,9 +193,11 @@ async def list_probes(filter: Optional[str] = None) -> Dict[str, Any]:
             stdin=asyncio.subprocess.PIPE
         )
         
-        # Send password
-        process.stdin.write(b"123456\n")
-        await process.stdin.drain()
+        # Send password to sudo
+        if SUDO_PASSWORD:
+            process.stdin.write(f"{SUDO_PASSWORD}\n".encode())
+            await process.stdin.drain()
+            process.stdin.close()
         
         stdout, stderr = await process.communicate()
         
@@ -370,6 +379,41 @@ async def get_result(
     return result
 
 
+def prompt_for_password():
+    """Prompt user for sudo password at startup"""
+    global SUDO_PASSWORD
+    
+    print("MCPtrace Server - bpftrace requires sudo access", file=sys.stderr)
+    print("Enter your sudo password (will be cached for this session only):", file=sys.stderr)
+    
+    try:
+        SUDO_PASSWORD = getpass.getpass(prompt="Password: ", stream=sys.stderr)
+        
+        # Test the password with a simple sudo command
+        test_cmd = ["sudo", "-S", "true"]
+        test_proc = subprocess.run(
+            test_cmd,
+            input=f"{SUDO_PASSWORD}\n".encode(),
+            capture_output=True
+        )
+        
+        if test_proc.returncode != 0:
+            print("Error: Invalid sudo password. Please try again.", file=sys.stderr)
+            sys.exit(1)
+            
+        print("Password verified. Starting MCP server...\n", file=sys.stderr)
+        
+    except KeyboardInterrupt:
+        print("\nCancelled by user.", file=sys.stderr)
+        sys.exit(0)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
+    # Prompt for password before starting server
+    prompt_for_password()
+    
     # Run the server
     mcp.run(transport="stdio")

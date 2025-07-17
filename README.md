@@ -11,19 +11,30 @@ A minimal MCP (Model Context Protocol) server that provides AI assistants with a
 
 ## Installation
 
-1. Install dependencies:
-```bash
-pip install mcp
-# or with uv:
-uv pip install mcp
-```
+### Prerequisites
 
-2. Ensure bpftrace is installed:
+1. Ensure bpftrace is installed:
 ```bash
 sudo apt-get install bpftrace  # Ubuntu/Debian
 # or
 sudo dnf install bpftrace      # Fedora
 ```
+
+2. Install Python dependencies:
+```bash
+pip install fastmcp
+# or
+pip install -r requirements.txt
+```
+
+### Quick Setup
+
+Use our automated setup scripts:
+
+- **Claude Desktop**: `./setup/setup_claude.sh`
+- **Claude Code**: `./setup/setup_claude_code.sh`
+
+For detailed setup instructions and manual configuration, see [setup/SETUP.md](./setup/SETUP.md).
 
 ## Running the Server
 
@@ -32,36 +43,14 @@ sudo dnf install bpftrace      # Fedora
 python test_server.py
 ```
 
-### MCP Inspector (recommended for development)
+### FastMCP Development Tools (recommended for development)
 ```bash
-uv run mcp dev server.py
+fastmcp dev server.py
 ```
 
-### With Claude Desktop
+### Manual Configuration
 
-1. Edit your Claude Desktop configuration:
-```bash
-# On macOS:
-nano ~/Library/Application\ Support/Claude/claude_desktop_config.json
-
-# On Linux:
-nano ~/.config/claude/claude_desktop_config.json
-```
-
-2. Add the server configuration:
-```json
-{
-  "mcpServers": {
-    "bpftrace": {
-      "command": "python",
-      "args": ["/path/to/MCPtrace/server.py"],
-      "env": {}
-    }
-  }
-}
-```
-
-3. Restart Claude Desktop
+For manual setup instructions for Claude Desktop or Claude Code, see [setup/SETUP.md](./setup/SETUP.md).
 
 ## Usage Examples
 
@@ -88,9 +77,15 @@ print(output["output"])
 ## Security Notes
 
 - The server requires sudo access for bpftrace
-- Currently uses hardcoded password (123456) - modify for production
+- **Password Handling**: The server prompts for sudo password at startup and caches it for the session
+- **Alternative**: Configure passwordless sudo for bpftrace:
+  ```bash
+  sudo visudo
+  # Add: your_username ALL=(ALL) NOPASSWD: /usr/bin/bpftrace
+  ```
 - No script validation - trust the AI client to generate safe scripts
 - Resource limits: 60s max execution, 10k lines buffer
+- See [SECURITY.md](./SECURITY.md) for detailed security configuration
 
 ## Architecture
 
@@ -106,6 +101,13 @@ The server uses:
 - Simple password handling (improve for production)
 - No persistent storage of executions
 - Basic error handling
+
+## Documentation
+
+- [Setup Guide](./setup/SETUP.md) - Detailed installation and configuration
+- [Claude Code Setup](./setup/CLAUDE_CODE_SETUP.md) - Claude Code specific instructions
+- [CLAUDE.md](./CLAUDE.md) - Development guidance for AI assistants
+- [Design Document](./doc/mcp-bpftrace-design.md) - Architecture and design details
 
 ## Future Enhancements
 
