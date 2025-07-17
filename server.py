@@ -13,11 +13,9 @@ from collections import defaultdict
 import shlex
 import os
 import signal
+from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
-
-# Initialize MCP server
-mcp = FastMCP("bpftrace-server")
 
 # Global storage for execution buffers
 execution_buffers: Dict[str, 'ExecutionBuffer'] = {}
@@ -25,6 +23,31 @@ execution_buffers: Dict[str, 'ExecutionBuffer'] = {}
 # Cleanup old buffers every 5 minutes
 BUFFER_CLEANUP_INTERVAL = 300
 BUFFER_MAX_AGE = 3600  # 1 hour
+
+async def cleanup_old_buffers():
+    """Periodically clean up old execution buffers"""
+    while True:
+        await asyncio.sleep(BUFFER_CLEANUP_INTERVAL)
+        current_time = time.time()
+        to_remove = []
+        
+        for exec_id, buffer in execution_buffers.items():
+            if current_time - buffer.creation_time > BUFFER_MAX_AGE:
+                to_remove.append(exec_id)
+                
+        for exec_id in to_remove:
+            del execution_buffers[exec_id]
+
+@asynccontextmanager
+async def lifespan(server):
+    """Initialize server and start background tasks"""
+    # Startup
+    asyncio.create_task(cleanup_old_buffers())
+    yield
+    # Shutdown (if needed)
+
+# Initialize MCP server with lifespan
+mcp = FastMCP("bpftrace-server", lifespan=lifespan)
 
 class ExecutionBuffer:
     """Stores output from a bpftrace execution"""
@@ -57,19 +80,6 @@ class ExecutionBuffer:
         self.error_message = error
 
 
-async def cleanup_old_buffers():
-    """Periodically clean up old execution buffers"""
-    while True:
-        await asyncio.sleep(BUFFER_CLEANUP_INTERVAL)
-        current_time = time.time()
-        to_remove = []
-        
-        for exec_id, buffer in execution_buffers.items():
-            if current_time - buffer.creation_time > BUFFER_MAX_AGE:
-                to_remove.append(exec_id)
-                
-        for exec_id in to_remove:
-            del execution_buffers[exec_id]
 
 
 async def run_bpftrace_program(execution_id: str, program: str, timeout: int):
@@ -360,14 +370,6 @@ async def get_result(
     return result
 
 
-# Start cleanup task when server starts
-@mcp.server.on_initialize
-async def on_initialize():
-    """Initialize server and start background tasks"""
-    asyncio.create_task(cleanup_old_buffers())
-
-
 if __name__ == "__main__":
     # Run the server
-    import sys
     mcp.run(transport="stdio")
