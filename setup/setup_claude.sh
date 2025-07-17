@@ -6,7 +6,7 @@ echo "🚀 Setting up bpftrace MCP server for Claude Desktop"
 echo "=================================================="
 
 # Get the absolute path of the current directory
-SERVER_PATH="$(pwd)/server.py"
+SERVER_PATH="$(pwd)/../server.py"
 
 # Detect OS and set config path
 if [[ "$OSTYPE" == "darwin"* ]]; then

@@ -12,7 +12,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Get the absolute path of the server
-SERVER_PATH="$(cd "$(dirname "$0")" && pwd)/server.py"
+SERVER_PATH="$(cd "$(dirname "$0")" && pwd)/../server.py"
 
 echo -e "${GREEN}📁 Server path: $SERVER_PATH${NC}"
 
@@ -35,10 +35,19 @@ if ! command -v python &> /dev/null && ! command -v python3 &> /dev/null; then
 fi
 
 # Determine Python command
-if command -v python3 &> /dev/null; then
+# First check if we're in a virtual environment
+if [ -n "$VIRTUAL_ENV" ]; then
+    PYTHON_CMD="python"
+    PIP_CMD="pip"
+elif [ -f "venv/bin/python" ]; then
+    PYTHON_CMD="$(pwd)/venv/bin/python"
+    PIP_CMD="$(pwd)/venv/bin/pip"
+elif command -v python3 &> /dev/null; then
     PYTHON_CMD="python3"
+    PIP_CMD="pip3"
 else
     PYTHON_CMD="python"
+    PIP_CMD="pip"
 fi
 
 echo -e "${GREEN}🐍 Using Python: $PYTHON_CMD${NC}"
@@ -82,8 +91,8 @@ echo -e "${GREEN}📦 Installing with $SCOPE_NAME scope${NC}"
 echo -e "${YELLOW}Checking Python dependencies...${NC}"
 if ! $PYTHON_CMD -c "import fastmcp" 2>/dev/null; then
     echo "Installing fastmcp..."
-    pip install fastmcp || {
-        echo -e "${RED}❌ Failed to install fastmcp. Please run: pip install fastmcp${NC}"
+    $PIP_CMD install fastmcp || {
+        echo -e "${RED}❌ Failed to install fastmcp. Please run: $PIP_CMD install fastmcp${NC}"
         exit 1
     }
 fi
