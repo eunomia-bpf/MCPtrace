@@ -11,16 +11,11 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Get the absolute path of the server
-SERVER_PATH="$(cd "$(dirname "$0")" && pwd)/../server.py"
+# Get the absolute path of the project
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SERVER_BINARY="$PROJECT_DIR/target/release/bpftrace-mcp-server"
 
-echo -e "${GREEN}📁 Server path: $SERVER_PATH${NC}"
-
-# Check if server.py exists
-if [ ! -f "$SERVER_PATH" ]; then
-    echo -e "${RED}❌ Error: server.py not found in current directory${NC}"
-    exit 1
-fi
+echo -e "${GREEN}📁 Project directory: $PROJECT_DIR${NC}"
 
 # Check if claude command exists
 if ! command -v claude &> /dev/null; then
@@ -28,29 +23,13 @@ if ! command -v claude &> /dev/null; then
     exit 1
 fi
 
-# Check Python installation
-if ! command -v python &> /dev/null && ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ Error: Python not found. Please install Python 3.10 or higher.${NC}"
+# Check if Rust is installed
+if ! command -v cargo &> /dev/null; then
+    echo -e "${RED}❌ Error: Rust/Cargo not found. Please install Rust from https://rustup.rs/${NC}"
     exit 1
 fi
 
-# Determine Python command
-# First check if we're in a virtual environment
-if [ -n "$VIRTUAL_ENV" ]; then
-    PYTHON_CMD="python"
-    PIP_CMD="pip"
-elif [ -f "venv/bin/python" ]; then
-    PYTHON_CMD="$(pwd)/venv/bin/python"
-    PIP_CMD="$(pwd)/venv/bin/pip"
-elif command -v python3 &> /dev/null; then
-    PYTHON_CMD="python3"
-    PIP_CMD="pip3"
-else
-    PYTHON_CMD="python"
-    PIP_CMD="pip"
-fi
-
-echo -e "${GREEN}🐍 Using Python: $PYTHON_CMD${NC}"
+echo -e "${GREEN}🦀 Rust/Cargo found${NC}"
 
 # Check if bpftrace is installed
 if ! command -v bpftrace &> /dev/null; then
@@ -87,21 +66,28 @@ esac
 
 echo -e "${GREEN}📦 Installing with $SCOPE_NAME scope${NC}"
 
-# Check if fastmcp is installed
-echo -e "${YELLOW}Checking Python dependencies...${NC}"
-if ! $PYTHON_CMD -c "import fastmcp" 2>/dev/null; then
-    echo "Installing fastmcp..."
-    $PIP_CMD install fastmcp || {
-        echo -e "${RED}❌ Failed to install fastmcp. Please run: $PIP_CMD install fastmcp${NC}"
-        exit 1
-    }
+# Build the Rust server
+echo ""
+echo -e "${GREEN}Building Rust server...${NC}"
+cd "$PROJECT_DIR"
+if cargo build --release; then
+    echo -e "${GREEN}✅ Successfully built bpftrace MCP server!${NC}"
+else
+    echo -e "${RED}❌ Failed to build server${NC}"
+    exit 1
+fi
+
+# Check if the binary exists
+if [ ! -f "$SERVER_BINARY" ]; then
+    echo -e "${RED}❌ Error: Server binary not found at $SERVER_BINARY${NC}"
+    exit 1
 fi
 
 # Add the server to Claude Code
 echo ""
 echo -e "${GREEN}Adding bpftrace server to Claude Code...${NC}"
 
-if claude mcp add $SCOPE bpftrace $PYTHON_CMD "$SERVER_PATH"; then
+if claude mcp add $SCOPE bpftrace "$SERVER_BINARY"; then
     echo -e "${GREEN}✅ Successfully added bpftrace MCP server!${NC}"
 else
     echo -e "${RED}❌ Failed to add server to Claude Code${NC}"
@@ -122,7 +108,7 @@ echo "  - 'Show me bpftrace helper functions'"
 echo "  - 'Trace system calls with bpftrace'"
 echo ""
 echo -e "${YELLOW}⚠️  Security Note:${NC}"
-echo "The server uses sudo with password '123456' by default."
+echo "The server will prompt for your sudo password when started."
 echo "For production use, configure passwordless sudo for bpftrace:"
 echo "  sudo visudo"
 echo "  Add: $USER ALL=(ALL) NOPASSWD: /usr/bin/bpftrace"

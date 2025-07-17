@@ -6,49 +6,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a bpftrace MCP (Model Context Protocol) server that provides AI assistants with access to Linux kernel tracing capabilities. The server acts as a bridge between AI models and the bpftrace tool, enabling kernel-level system observation and debugging.
 
+The server is implemented in Rust using the `rmcp` crate from the rust-sdk.
+
 ## Development Commands
 
 ### Setup and Dependencies
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Linux/Mac
+# Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Install dependencies
-pip install -r requirements.txt
-# or
-pip install fastmcp
+# Build the server
+cargo build --release
 ```
 
 ### Running the Server
 ```bash
-# Run test script (includes example usage)
-python test_server.py
-
-# Run with MCP dev tools (recommended for development)
-uv run mcp dev server.py
-
 # Direct execution
-python server.py
+./target/release/bpftrace-mcp-server
+
+# Through cargo
+cargo run --release
 ```
 
 ### Testing
-There is no formal test framework. Use `test_server.py` for manual testing of all four server functions.
+```bash
+# Run unit tests
+cargo test
+
+# Run with verbose output
+cargo test -- --nocapture
+```
 
 ## Architecture
 
-The server is built with FastMCP and provides four main tools:
+The server is built with the rmcp crate and provides four main tools:
 
-1. **list_probes** - Lists available bpftrace probes (server.py:53-79)
-2. **list_helpers** - Shows bpftrace helper functions (server.py:81-104)
-3. **exec_program** - Executes bpftrace programs asynchronously (server.py:149-199)
-4. **get_result** - Retrieves execution results (server.py:201-217)
+1. **list_probes** - Lists available bpftrace probes with optional filtering
+2. **list_helpers** - Shows bpftrace helper functions
+3. **exec_program** - Executes bpftrace programs asynchronously
+4. **get_result** - Retrieves execution results
 
 ### Key Components
 
-- **ExecutionBuffer** (server.py:106-147): Manages async output collection from bpftrace processes
-- **Global execution_buffers**: In-memory storage for active executions
-- **Cleanup task**: Removes old buffers after 1 hour (server.py:27-40)
+- **ExecutionBuffer** (src/main.rs): Manages async output collection from bpftrace processes
+- **DashMap execution_buffers**: Thread-safe concurrent storage for active executions
+- **Cleanup task**: Background task that removes old buffers after 1 hour
+- **BpftraceServer**: Main server struct implementing the MCP ServerHandler trait
 
 ### Security Considerations
 
@@ -68,13 +71,16 @@ The server is built with FastMCP and provides four main tools:
 ## Common Development Tasks
 
 When modifying the server:
-- Test all four functions using `test_server.py` after changes
+- Run `cargo build --release` after changes
+- Test all four functions manually or with test cases
 - Ensure proper error handling for subprocess failures
 - Maintain async patterns for non-blocking operations
 - Consider security implications of any changes to bpftrace execution
+- Use `cargo clippy` for linting and `cargo fmt` for formatting
 
 ## Dependencies
 
-- Python >=3.10
-- fastmcp (only external dependency)
+- Rust (latest stable version)
+- rmcp crate with server and transport-io features
+- tokio async runtime
 - bpftrace (system requirement, must be installed separately)

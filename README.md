@@ -2,6 +2,8 @@
 
 A minimal MCP (Model Context Protocol) server that provides AI assistants with access to bpftrace kernel tracing capabilities.
 
+**Now implemented in Rust** using the `rmcp` crate for better performance and type safety. The Python implementation is still available in the git history.
+
 ## Features
 
 - **list_probes**: List available bpftrace probes with optional filtering
@@ -13,18 +15,21 @@ A minimal MCP (Model Context Protocol) server that provides AI assistants with a
 
 ### Prerequisites
 
-1. Ensure bpftrace is installed:
+1. Install Rust (if not already installed):
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+2. Ensure bpftrace is installed:
 ```bash
 sudo apt-get install bpftrace  # Ubuntu/Debian
 # or
 sudo dnf install bpftrace      # Fedora
 ```
 
-2. Install Python dependencies:
+3. Build the server:
 ```bash
-pip install fastmcp
-# or
-pip install -r requirements.txt
+cargo build --release
 ```
 
 ### Quick Setup
@@ -38,14 +43,14 @@ For detailed setup instructions and manual configuration, see [setup/SETUP.md](.
 
 ## Running the Server
 
-### Standalone Mode (for testing)
+### Direct Execution
 ```bash
-python test_server.py
+./target/release/bpftrace-mcp-server
 ```
 
-### FastMCP Development Tools (recommended for development)
+### Through Cargo
 ```bash
-fastmcp dev server.py
+cargo run --release
 ```
 
 ### Manual Configuration
@@ -89,11 +94,12 @@ print(output["output"])
 
 ## Architecture
 
-The server uses:
-- AsyncIO for concurrent operations
+The Rust server uses:
+- Tokio async runtime for concurrent operations
 - Subprocess management for bpftrace execution
-- In-memory buffering for output storage
+- DashMap for thread-safe in-memory buffering
 - Automatic cleanup of old buffers
+- rmcp crate for MCP protocol implementation
 
 ## Limitations
 
