@@ -14,7 +14,7 @@ import shlex
 import os
 import signal
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 # Initialize MCP server
 mcp = FastMCP("bpftrace-server")

@@ -5,7 +5,7 @@ description = "MCP server for bpftrace kernel tracing"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.0.0",
+    "fastmcp",
 ]
 
 [build-system]
