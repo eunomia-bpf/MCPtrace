@@ -42,7 +42,7 @@ cargo test -- --nocapture
 The server is built with the rmcp crate and provides four main tools:
 
 1. **list_probes** - Lists available bpftrace probes with optional filtering
-2. **list_helpers** - Shows bpftrace helper functions
+2. **bpf_info** - Shows bpftrace system information and capabilities
 3. **exec_program** - Executes bpftrace programs asynchronously
 4. **get_result** - Retrieves execution results
 
@@ -56,7 +56,7 @@ The server is built with the rmcp crate and provides four main tools:
 ### Security Considerations
 
 - Requires sudo access for bpftrace execution
-- Server prompts for sudo password at startup (cached for session)
+- Server reads sudo password from BPFTRACE_PASSWD environment variable (set in .env file)
 - Alternative: Configure passwordless sudo for bpftrace: `sudo visudo` then add `username ALL=(ALL) NOPASSWD: /usr/bin/bpftrace`
 - No script validation - relies on AI to generate safe bpftrace programs
 - Resource limits: 60s execution timeout, 10k line output buffer

@@ -13,7 +13,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "std", "fmt"] }
 uuid = { version = "1.10", features = ["v4"] }
 schemars = "1.0"
-rpassword = "7.3"
 dashmap = "6.1"
 dotenv = "0.15"
 

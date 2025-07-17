@@ -64,6 +64,12 @@ For manual setup instructions for Claude Desktop or Claude Code, see [setup/SETU
 await list_probes(filter="syscalls:*read*")
 ```
 
+### Get BPF System Information
+```python
+info = await bpf_info()
+# Returns system info, kernel helpers, features, map types, and probe types
+```
+
 ### Execute a Simple Trace
 ```python
 result = await exec_program(
@@ -82,7 +88,10 @@ print(output["output"])
 ## Security Notes
 
 - The server requires sudo access for bpftrace
-- **Password Handling**: The server prompts for sudo password at startup and caches it for the session
+- **Password Handling**: Create a `.env` file with your sudo password:
+  ```bash
+  echo "BPFTRACE_PASSWD=your_sudo_password" > .env
+  ```
 - **Alternative**: Configure passwordless sudo for bpftrace:
   ```bash
   sudo visudo

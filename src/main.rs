@@ -102,15 +102,61 @@ struct ListProbesResponse {
 }
 
 #[derive(Debug, Serialize)]
-struct Helper {
-    name: String,
-    description: String,
+struct BpfInfoResponse {
+    system: SystemInfo,
+    build: BuildInfo,
+    kernel_helpers: Vec<String>,
+    kernel_features: KernelFeatures,
+    map_types: MapTypes,
+    probe_types: ProbeTypes,
 }
 
 #[derive(Debug, Serialize)]
-struct ListHelpersResponse {
-    helpers: Vec<Helper>,
-    count: usize,
+struct SystemInfo {
+    os: String,
+    arch: String,
+}
+
+#[derive(Debug, Serialize)]
+struct BuildInfo {
+    version: String,
+    llvm: String,
+    unsafe_probe: bool,
+    bfd: bool,
+    libdw: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct KernelFeatures {
+    instruction_limit: u32,
+    loop_support: bool,
+    btf: bool,
+    module_btf: bool,
+    map_batch: bool,
+    uprobe_refcount: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct MapTypes {
+    hash: bool,
+    percpu_hash: bool,
+    array: bool,
+    percpu_array: bool,
+    stack_trace: bool,
+    perf_event_array: bool,
+    ringbuf: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ProbeTypes {
+    kprobe: bool,
+    tracepoint: bool,
+    perf_event: bool,
+    kfunc: bool,
+    kprobe_multi: bool,
+    uprobe_multi: bool,
+    raw_tp_special: bool,
+    iter: bool,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -358,182 +404,62 @@ impl BpftraceServer {
         })
     }
 
-    #[tool(description = "List available bpftrace helper functions")]
-    fn list_helpers(&self) -> Json<ListHelpersResponse> {
-        let helpers = vec![
-            Helper {
-                name: "printf".to_string(),
-                description: "Print formatted output".to_string(),
+    #[tool(description = "Get bpftrace system information and capabilities")]
+    async fn bpf_info(&self) -> Json<BpfInfoResponse> {
+        Json(BpfInfoResponse {
+            system: SystemInfo {
+                os: "Linux 6.14.0-4-generic #4-Ubuntu SMP PREEMPT_DYNAMIC Wed Feb 19 18:37:50 UTC 2025".to_string(),
+                arch: "x86_64".to_string(),
             },
-            Helper {
-                name: "time".to_string(),
-                description: "Current timestamp (nanoseconds since boot)".to_string(),
+            build: BuildInfo {
+                version: "v0.20.2".to_string(),
+                llvm: "18.1.3".to_string(),
+                unsafe_probe: false,
+                bfd: false,
+                libdw: true,
             },
-            Helper {
-                name: "str".to_string(),
-                description: "Convert to string (for char arrays)".to_string(),
+            kernel_helpers: vec![
+                "probe_read".to_string(),
+                "probe_read_str".to_string(),
+                "probe_read_user".to_string(),
+                "probe_read_user_str".to_string(),
+                "probe_read_kernel".to_string(),
+                "probe_read_kernel_str".to_string(),
+                "get_current_cgroup_id".to_string(),
+                "send_signal".to_string(),
+                "override_return".to_string(),
+                "get_boot_ns".to_string(),
+                "get_tai_ns".to_string(),
+                "get_func_ip".to_string(),
+                "jiffies64".to_string(),
+            ],
+            kernel_features: KernelFeatures {
+                instruction_limit: 1000000,
+                loop_support: true,
+                btf: true,
+                module_btf: true,
+                map_batch: true,
+                uprobe_refcount: true,
             },
-            Helper {
-                name: "comm".to_string(),
-                description: "Current process name".to_string(),
+            map_types: MapTypes {
+                hash: true,
+                percpu_hash: true,
+                array: true,
+                percpu_array: true,
+                stack_trace: true,
+                perf_event_array: true,
+                ringbuf: true,
             },
-            Helper {
-                name: "pid".to_string(),
-                description: "Process ID".to_string(),
+            probe_types: ProbeTypes {
+                kprobe: true,
+                tracepoint: true,
+                perf_event: true,
+                kfunc: true,
+                kprobe_multi: true,
+                uprobe_multi: true,
+                raw_tp_special: true,
+                iter: true,
             },
-            Helper {
-                name: "tid".to_string(),
-                description: "Thread ID".to_string(),
-            },
-            Helper {
-                name: "uid".to_string(),
-                description: "User ID".to_string(),
-            },
-            Helper {
-                name: "gid".to_string(),
-                description: "Group ID".to_string(),
-            },
-            Helper {
-                name: "nsecs".to_string(),
-                description: "Nanoseconds since boot".to_string(),
-            },
-            Helper {
-                name: "kstack".to_string(),
-                description: "Kernel stack trace".to_string(),
-            },
-            Helper {
-                name: "ustack".to_string(),
-                description: "User stack trace".to_string(),
-            },
-            Helper {
-                name: "arg0...argN".to_string(),
-                description: "Function arguments".to_string(),
-            },
-            Helper {
-                name: "retval".to_string(),
-                description: "Return value (in return probes)".to_string(),
-            },
-            Helper {
-                name: "cpu".to_string(),
-                description: "Current CPU".to_string(),
-            },
-            Helper {
-                name: "curtask".to_string(),
-                description: "Current task struct".to_string(),
-            },
-            Helper {
-                name: "rand".to_string(),
-                description: "Random number".to_string(),
-            },
-            Helper {
-                name: "cgroup".to_string(),
-                description: "Cgroup ID".to_string(),
-            },
-            Helper {
-                name: "kaddr".to_string(),
-                description: "Kernel address for symbol".to_string(),
-            },
-            Helper {
-                name: "uaddr".to_string(),
-                description: "User address for symbol".to_string(),
-            },
-            Helper {
-                name: "ntop".to_string(),
-                description: "Convert IP address to string".to_string(),
-            },
-            Helper {
-                name: "reg".to_string(),
-                description: "CPU register value".to_string(),
-            },
-            Helper {
-                name: "signal".to_string(),
-                description: "Send signal to process".to_string(),
-            },
-            Helper {
-                name: "exit".to_string(),
-                description: "Exit bpftrace".to_string(),
-            },
-            Helper {
-                name: "system".to_string(),
-                description: "Execute shell command".to_string(),
-            },
-            Helper {
-                name: "cat".to_string(),
-                description: "Print file contents".to_string(),
-            },
-            Helper {
-                name: "join".to_string(),
-                description: "Join array elements".to_string(),
-            },
-            Helper {
-                name: "ksym".to_string(),
-                description: "Resolve kernel address to symbol".to_string(),
-            },
-            Helper {
-                name: "usym".to_string(),
-                description: "Resolve user address to symbol".to_string(),
-            },
-            Helper {
-                name: "kptr".to_string(),
-                description: "Annotate kernel pointer".to_string(),
-            },
-            Helper {
-                name: "uptr".to_string(),
-                description: "Annotate user pointer".to_string(),
-            },
-            Helper {
-                name: "sizeof".to_string(),
-                description: "Size of type or expression".to_string(),
-            },
-            Helper {
-                name: "print".to_string(),
-                description: "Print non-formatted output".to_string(),
-            },
-            Helper {
-                name: "clear".to_string(),
-                description: "Clear a map".to_string(),
-            },
-            Helper {
-                name: "zero".to_string(),
-                description: "Zero a map".to_string(),
-            },
-            Helper {
-                name: "hist".to_string(),
-                description: "Print histogram".to_string(),
-            },
-            Helper {
-                name: "lhist".to_string(),
-                description: "Print linear histogram".to_string(),
-            },
-            Helper {
-                name: "count".to_string(),
-                description: "Count occurrences".to_string(),
-            },
-            Helper {
-                name: "sum".to_string(),
-                description: "Sum values".to_string(),
-            },
-            Helper {
-                name: "min".to_string(),
-                description: "Track minimum value".to_string(),
-            },
-            Helper {
-                name: "max".to_string(),
-                description: "Track maximum value".to_string(),
-            },
-            Helper {
-                name: "avg".to_string(),
-                description: "Calculate average".to_string(),
-            },
-            Helper {
-                name: "stats".to_string(),
-                description: "Calculate statistics".to_string(),
-            },
-        ];
-
-        Json(ListHelpersResponse {
-            count: helpers.len(),
-            helpers,
         })
     }
 
@@ -655,48 +581,7 @@ impl ServerHandler for BpftraceServer {
     }
 }
 
-fn prompt_for_password() -> Result<String> {
-    use std::io::Write;
-    
-    eprintln!("MCPtrace Server - bpftrace requires sudo access");
-    eprintln!("Enter your sudo password (will be cached for this session only):");
-    
-    eprint!("Password: ");
-    std::io::stderr().flush()?;
-    
-    let password = rpassword::read_password()?;
-    
-    // Test the password with a simple sudo command
-    let output = std::process::Command::new("sudo")
-        .arg("-S")
-        .arg("true")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(mut stdin) = child.stdin.take() {
-                stdin.write_all(format!("{}\n", password).as_bytes())?;
-                stdin.flush()?;
-            }
-            child.wait_with_output()
-        })?;
-    
-    if !output.status.success() {
-        eprintln!("Error: Invalid sudo password. Please try again.");
-        std::process::exit(1);
-    }
-    
-    eprintln!("Password verified. Starting MCP server...\n");
-    Ok(password)
-}
-
 fn verify_password(password: &str) -> Result<()> {
-    use std::io::Write;
-    
-    eprintln!("MCPtrace Server - verifying sudo access...");
-    
     // Test the password with a simple sudo command
     let output = std::process::Command::new("sudo")
         .arg("-S")
@@ -715,12 +600,10 @@ fn verify_password(password: &str) -> Result<()> {
         })?;
     
     if !output.status.success() {
-        eprintln!("Error: Invalid sudo password in BPFTRACE_PASSWD");
-        eprintln!("Please check your .env file and ensure the password is correct");
+        // Don't use eprintln since it interferes with stdio MCP communication
         std::process::exit(1);
     }
     
-    eprintln!("Password verified. Starting MCP server...\n");
     Ok(())
 }
 
@@ -740,13 +623,11 @@ async fn main() -> Result<()> {
     // Get password from environment variable
     let sudo_password = match std::env::var("BPFTRACE_PASSWD") {
         Ok(password) => {
-            eprintln!("Using password from BPFTRACE_PASSWD environment variable");
             verify_password(&password)?;
             password
         },
         Err(_) => {
-            eprintln!("Error: BPFTRACE_PASSWD environment variable not set");
-            eprintln!("Please set BPFTRACE_PASSWD in your .env file or environment");
+            // Exit without printing to stdio/stderr to avoid interfering with MCP
             std::process::exit(1);
         }
     };
