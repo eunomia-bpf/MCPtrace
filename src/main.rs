@@ -1,12 +1,14 @@
 use anyhow::Result;
 use dashmap::DashMap;
 use rmcp::{
-    handler::server::{router::tool::ToolRouter, tool::Parameters, wrapper::Json},
-    model::{ServerCapabilities, ServerInfo},
-    schemars, serve_server, tool, tool_handler, tool_router,
-    ServerHandler,
+    handler::server::{router::tool::ToolRouter, tool::Parameters},
+    model::*,
+    schemars, tool, tool_handler, tool_router,
+    transport::stdio,
+    ServerHandler, ServiceExt,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{
     future::Future,
     process::Stdio,
@@ -21,6 +23,8 @@ use tokio::{
 };
 use tracing::info;
 use uuid::Uuid;
+
+type McpError = rmcp::model::ErrorData;
 
 #[derive(Debug, Clone)]
 struct ExecutionBuffer {
@@ -339,7 +343,7 @@ impl BpftraceServer {
     async fn list_probes(
         &self,
         Parameters(ListProbesRequest { filter }): Parameters<ListProbesRequest>,
-    ) -> Json<ListProbesResponse> {
+    ) -> Result<CallToolResult, McpError> {
         let mut cmd = Command::new("sudo");
         cmd.arg("-S").arg("bpftrace").arg("-l");
         
@@ -354,11 +358,10 @@ impl BpftraceServer {
         let mut child = match cmd.spawn() {
             Ok(child) => child,
             Err(e) => {
-                return Json(ListProbesResponse {
-                    probes: vec![],
-                    count: 0,
-                    error: Some(format!("Failed to spawn process: {}", e)),
-                });
+                return Err(McpError::internal_error(
+                    "Failed to spawn bpftrace process",
+                    Some(json!({"error": e.to_string()})),
+                ));
             }
         };
 
@@ -374,20 +377,18 @@ impl BpftraceServer {
         let output = match child.wait_with_output().await {
             Ok(output) => output,
             Err(e) => {
-                return Json(ListProbesResponse {
-                    probes: vec![],
-                    count: 0,
-                    error: Some(format!("Failed to execute: {}", e)),
-                });
+                return Err(McpError::internal_error(
+                    "Failed to execute bpftrace",
+                    Some(json!({"error": e.to_string()})),
+                ));
             }
         };
 
         if !output.status.success() {
-            return Json(ListProbesResponse {
-                probes: vec![],
-                count: 0,
-                error: Some(String::from_utf8_lossy(&output.stderr).to_string()),
-            });
+            return Err(McpError::internal_error(
+                "Bpftrace command failed",
+                Some(json!({"stderr": String::from_utf8_lossy(&output.stderr).to_string()})),
+            ));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -397,16 +398,17 @@ impl BpftraceServer {
             .map(|s| s.to_string())
             .collect();
 
-        Json(ListProbesResponse {
-            probes: probes.clone(),
-            count: probes.len(),
-            error: None,
-        })
+        Ok(CallToolResult::success(vec![Content::text(
+            json!({
+                "probes": probes,
+                "count": probes.len()
+            }).to_string()
+        )]))
     }
 
     #[tool(description = "Get bpftrace system information and capabilities")]
-    async fn bpf_info(&self) -> Json<BpfInfoResponse> {
-        Json(BpfInfoResponse {
+    async fn bpf_info(&self) -> Result<CallToolResult, McpError> {
+        let info = BpfInfoResponse {
             system: SystemInfo {
                 os: "Linux 6.14.0-4-generic #4-Ubuntu SMP PREEMPT_DYNAMIC Wed Feb 19 18:37:50 UTC 2025".to_string(),
                 arch: "x86_64".to_string(),
@@ -460,14 +462,18 @@ impl BpftraceServer {
                 raw_tp_special: true,
                 iter: true,
             },
-        })
+        };
+        
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string_pretty(&info).unwrap()
+        )]))
     }
 
     #[tool(description = "Execute a bpftrace program with buffered output")]
     async fn exec_program(
         &self,
         Parameters(ExecProgramRequest { program, timeout }): Parameters<ExecProgramRequest>,
-    ) -> Json<ExecProgramResponse> {
+    ) -> Result<CallToolResult, McpError> {
         // Validate timeout
         let timeout = timeout.clamp(1, 60);
 
@@ -506,19 +512,20 @@ impl BpftraceServer {
                     .await
                     .clone()
                     .unwrap_or_else(|| "Failed to start program".to_string());
-                return Json(ExecProgramResponse {
-                    status: "error".to_string(),
-                    execution_id: None,
-                    message: error_msg,
-                });
+                return Err(McpError::internal_error(
+                    "Failed to start bpftrace program", 
+                    Some(json!({"error": error_msg})),
+                ));
             }
         }
 
-        Json(ExecProgramResponse {
-            status: "success".to_string(),
-            execution_id: Some(execution_id),
-            message: "Program started successfully".to_string(),
-        })
+        Ok(CallToolResult::success(vec![Content::text(
+            json!({
+                "execution_id": execution_id,
+                "status": "started",
+                "message": format!("Program execution started with timeout of {}s", timeout)
+            }).to_string()
+        )]))
     }
 
     #[tool(description = "Get buffered output from a bpftrace execution")]
@@ -529,7 +536,7 @@ impl BpftraceServer {
             offset,
             limit,
         }): Parameters<GetResultRequest>,
-    ) -> Json<GetResultResponse> {
+    ) -> Result<CallToolResult, McpError> {
         if let Some(buffer) = self.execution_buffers.get(&execution_id) {
             let lines = buffer.lines.lock().await;
             let total_lines = lines.len();
@@ -545,27 +552,23 @@ impl BpftraceServer {
                 None
             };
 
-            Json(GetResultResponse {
-                execution_id,
-                status,
-                lines_total: total_lines,
-                lines_returned: output_lines.len(),
-                output: output_lines,
-                has_more: end_index < total_lines,
-                error_message,
-                duration,
-            })
+            Ok(CallToolResult::success(vec![Content::text(
+                json!({
+                    "execution_id": execution_id,
+                    "status": status,
+                    "lines_total": total_lines,
+                    "lines_returned": output_lines.len(),
+                    "output": output_lines,
+                    "has_more": end_index < total_lines,
+                    "error_message": error_message,
+                    "duration": duration
+                }).to_string()
+            )]))
         } else {
-            Json(GetResultResponse {
-                execution_id: execution_id.clone(),
-                status: "error".to_string(),
-                lines_total: 0,
-                lines_returned: 0,
-                output: vec![],
-                has_more: false,
-                error_message: Some("Execution ID not found".to_string()),
-                duration: None,
-            })
+            Err(McpError::invalid_params(
+                "Execution ID not found",
+                None,
+            ))
         }
     }
 }
@@ -574,9 +577,10 @@ impl BpftraceServer {
 impl ServerHandler for BpftraceServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            instructions: Some("MCP server for bpftrace - provides Linux kernel tracing capabilities".to_string()),
+            protocol_version: ProtocolVersion::V_2024_11_05,
             capabilities: ServerCapabilities::builder().enable_tools().build(),
-            ..Default::default()
+            server_info: Implementation::from_build_env(),
+            instructions: Some("MCP server for bpftrace - provides Linux kernel tracing capabilities".to_string()),
         }
     }
 }
@@ -636,9 +640,11 @@ async fn main() -> Result<()> {
     
     info!("Starting bpftrace MCP server on stdio");
     
-    let io = (tokio::io::stdin(), tokio::io::stdout());
-    
-    serve_server(server, io).await?;
+    let service = server.serve(stdio()).await.inspect_err(|e| {
+        tracing::error!("serving error: {:?}", e);
+    })?;
+
+    service.waiting().await?;
     
     Ok(())
 }
