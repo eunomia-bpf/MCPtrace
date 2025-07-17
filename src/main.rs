@@ -105,63 +105,6 @@ struct ListProbesResponse {
     error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct BpfInfoResponse {
-    system: SystemInfo,
-    build: BuildInfo,
-    kernel_helpers: Vec<String>,
-    kernel_features: KernelFeatures,
-    map_types: MapTypes,
-    probe_types: ProbeTypes,
-}
-
-#[derive(Debug, Serialize)]
-struct SystemInfo {
-    os: String,
-    arch: String,
-}
-
-#[derive(Debug, Serialize)]
-struct BuildInfo {
-    version: String,
-    llvm: String,
-    unsafe_probe: bool,
-    bfd: bool,
-    libdw: bool,
-}
-
-#[derive(Debug, Serialize)]
-struct KernelFeatures {
-    instruction_limit: u32,
-    loop_support: bool,
-    btf: bool,
-    module_btf: bool,
-    map_batch: bool,
-    uprobe_refcount: bool,
-}
-
-#[derive(Debug, Serialize)]
-struct MapTypes {
-    hash: bool,
-    percpu_hash: bool,
-    array: bool,
-    percpu_array: bool,
-    stack_trace: bool,
-    perf_event_array: bool,
-    ringbuf: bool,
-}
-
-#[derive(Debug, Serialize)]
-struct ProbeTypes {
-    kprobe: bool,
-    tracepoint: bool,
-    perf_event: bool,
-    kfunc: bool,
-    kprobe_multi: bool,
-    uprobe_multi: bool,
-    raw_tp_special: bool,
-    iter: bool,
-}
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct ExecProgramRequest {
@@ -408,65 +351,53 @@ impl BpftraceServer {
 
     #[tool(description = "Get bpftrace system information and capabilities")]
     async fn bpf_info(&self) -> Result<CallToolResult, McpError> {
-        let info = BpfInfoResponse {
-            system: SystemInfo {
-                os: "Linux 6.14.0-4-generic #4-Ubuntu SMP PREEMPT_DYNAMIC Wed Feb 19 18:37:50 UTC 2025".to_string(),
-                arch: "x86_64".to_string(),
-            },
-            build: BuildInfo {
-                version: "v0.20.2".to_string(),
-                llvm: "18.1.3".to_string(),
-                unsafe_probe: false,
-                bfd: false,
-                libdw: true,
-            },
-            kernel_helpers: vec![
-                "probe_read".to_string(),
-                "probe_read_str".to_string(),
-                "probe_read_user".to_string(),
-                "probe_read_user_str".to_string(),
-                "probe_read_kernel".to_string(),
-                "probe_read_kernel_str".to_string(),
-                "get_current_cgroup_id".to_string(),
-                "send_signal".to_string(),
-                "override_return".to_string(),
-                "get_boot_ns".to_string(),
-                "get_tai_ns".to_string(),
-                "get_func_ip".to_string(),
-                "jiffies64".to_string(),
-            ],
-            kernel_features: KernelFeatures {
-                instruction_limit: 1000000,
-                loop_support: true,
-                btf: true,
-                module_btf: true,
-                map_batch: true,
-                uprobe_refcount: true,
-            },
-            map_types: MapTypes {
-                hash: true,
-                percpu_hash: true,
-                array: true,
-                percpu_array: true,
-                stack_trace: true,
-                perf_event_array: true,
-                ringbuf: true,
-            },
-            probe_types: ProbeTypes {
-                kprobe: true,
-                tracepoint: true,
-                perf_event: true,
-                kfunc: true,
-                kprobe_multi: true,
-                uprobe_multi: true,
-                raw_tp_special: true,
-                iter: true,
-            },
+        let mut cmd = Command::new("sudo");
+        cmd.arg("-S")
+            .arg("bpftrace")
+            .arg("--info")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        let mut child = match cmd.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                return Err(McpError::internal_error(
+                    "Failed to spawn bpftrace process",
+                    Some(json!({"error": e.to_string()})),
+                ));
+            }
         };
+
+        // Send password to sudo
+        if let Some(mut stdin) = child.stdin.take() {
+            use tokio::io::AsyncWriteExt;
+            let _ = stdin
+                .write_all(format!("{}\n", self.sudo_password).as_bytes())
+                .await;
+            let _ = stdin.flush().await;
+        }
+
+        let output = match child.wait_with_output().await {
+            Ok(output) => output,
+            Err(e) => {
+                return Err(McpError::internal_error(
+                    "Failed to execute bpftrace",
+                    Some(json!({"error": e.to_string()})),
+                ));
+            }
+        };
+
+        if !output.status.success() {
+            return Err(McpError::internal_error(
+                "Bpftrace command failed",
+                Some(json!({"stderr": String::from_utf8_lossy(&output.stderr).to_string()})),
+            ));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
         
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&info).unwrap()
-        )]))
+        Ok(CallToolResult::success(vec![Content::text(stdout.to_string())]))
     }
 
     #[tool(description = "Execute a bpftrace program with buffered output")]
