@@ -8,10 +8,20 @@ A minimal MCP (Model Context Protocol) server that provides AI assistants with a
 
 ## Features
 
-- **list_probes**: List available bpftrace probes with optional filtering
-- **list_helpers**: Get information about bpftrace helper functions
-- **exec_program**: Execute bpftrace programs with buffered output
-- **get_result**: Retrieve execution results asynchronously
+- **AI-Powered Kernel Debugging**: Enable AI assistants to help you debug complex Linux kernel issues through natural language - no eBPF expertise required
+- **Discover System Trace Points**: Browse and search through thousands of kernel probes to find exactly what you need to monitor - from system calls to network packets
+- **Rich Context and Examples**: Access a curated collection of production-ready bpftrace scripts for common debugging scenarios like performance bottlenecks, security monitoring, and system troubleshooting
+- **Secure Execution Model**: Run kernel traces safely without giving AI direct root access - MCPtrace acts as a secure gateway with proper authentication
+- **Asynchronous Operation**: Start long-running traces and retrieve results later - perfect for monitoring production issues that occur intermittently
+- **System Capability Detection**: Automatically discover what tracing features your kernel supports, including available helpers, map types, and probe types
+
+## Why MCPtrace?
+
+Debugging kernel issues traditionally requires deep eBPF expertise. MCPtrace changes that.
+
+By bridging AI assistants with bpftrace (the perfect eBPF tracing language), MCPtrace lets you debug complex system issues through natural conversation. Just describe what you want to observe - "show me which processes are opening files" or "trace slow disk operations" - and let AI generate the appropriate kernel traces.
+
+AI never gets root access. MCPtrace acts as a secure gateway, and with its rich collection of example scripts and probe information, AI has everything needed to help you understand what's happening inside your kernel. No eBPF expertise required.
 
 ## Installation
 
