@@ -2,6 +2,14 @@
 name = "bpftrace-mcp-server"
 version = "0.1.0"
 edition = "2021"
+authors = ["yunwei37 <1067852565@qq.com>"]
+description = "A Model Context Protocol (MCP) server that provides AI assistants with access to bpftrace kernel tracing capabilities"
+repository = "https://github.com/yunwei37/MCPtrace"
+homepage = "https://github.com/yunwei37/MCPtrace"
+license = "MIT"
+readme = "README.md"
+keywords = ["mcp", "bpftrace", "ebpf", "kernel", "tracing"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 rmcp = { version = "0.2.0", features = ["server", "transport-io"] }
