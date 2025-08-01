@@ -1,6 +1,6 @@
 [package]
 name = "bpftrace-mcp-server"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["yunwei37 <1067852565@qq.com>"]
 description = "A Model Context Protocol (MCP) server that provides AI assistants with access to bpftrace kernel tracing capabilities"
