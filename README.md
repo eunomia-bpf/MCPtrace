@@ -39,10 +39,25 @@ sudo apt-get install bpftrace  # Ubuntu/Debian
 sudo dnf install bpftrace      # Fedora
 ```
 
-3. Build the server:
+### Install from crates.io (Recommended)
+
 ```bash
+cargo install bpftrace-mcp-server
+```
+
+This will install the `bpftrace-mcp-server` binary to your Cargo bin directory (usually `~/.cargo/bin/`).
+
+### Build from Source
+
+Alternatively, you can build from source:
+
+```bash
+git clone https://github.com/yunwei37/MCPtrace
+cd MCPtrace
 cargo build --release
 ```
+
+The binary will be available at `./target/release/bpftrace-mcp-server`.
 
 ### Quick Setup
 
@@ -55,12 +70,17 @@ For detailed setup instructions and manual configuration, see [setup/SETUP.md](.
 
 ## Running the Server
 
-### Direct Execution
+### If installed via cargo install
+```bash
+bpftrace-mcp-server
+```
+
+### If built from source
 ```bash
 ./target/release/bpftrace-mcp-server
 ```
 
-### Through Cargo
+### Development mode (from source)
 ```bash
 cargo run --release
 ```

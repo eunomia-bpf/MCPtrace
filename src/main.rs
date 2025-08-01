@@ -7,7 +7,7 @@ use rmcp::{
     transport::stdio,
     ServerHandler, ServiceExt,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::{
     future::Future,
@@ -28,7 +28,6 @@ type McpError = rmcp::model::ErrorData;
 
 #[derive(Debug, Clone)]
 struct ExecutionBuffer {
-    execution_id: String,
     lines: Arc<Mutex<Vec<String>>>,
     status: Arc<Mutex<String>>,
     max_lines: usize,
@@ -38,9 +37,8 @@ struct ExecutionBuffer {
 }
 
 impl ExecutionBuffer {
-    fn new(execution_id: String, max_lines: usize) -> Self {
+    fn new(max_lines: usize) -> Self {
         Self {
-            execution_id,
             lines: Arc::new(Mutex::new(Vec::new())),
             status: Arc::new(Mutex::new("running".to_string())),
             max_lines,
@@ -97,13 +95,6 @@ struct ListProbesRequest {
     filter: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct ListProbesResponse {
-    probes: Vec<String>,
-    count: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
 
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -119,13 +110,6 @@ fn default_timeout() -> u64 {
     10
 }
 
-#[derive(Debug, Serialize)]
-struct ExecProgramResponse {
-    status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    execution_id: Option<String>,
-    message: String,
-}
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct GetResultRequest {
@@ -143,19 +127,6 @@ fn default_limit() -> usize {
     1000
 }
 
-#[derive(Debug, Serialize)]
-struct GetResultResponse {
-    execution_id: String,
-    status: String,
-    lines_total: usize,
-    lines_returned: usize,
-    output: Vec<String>,
-    has_more: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error_message: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    duration: Option<u64>,
-}
 
 impl BpftraceServer {
     async fn run_bpftrace_program(
@@ -412,7 +383,7 @@ impl BpftraceServer {
         let execution_id = format!("exec_{}", Uuid::new_v4().to_string()[..8].to_string());
 
         // Create buffer
-        let buffer = ExecutionBuffer::new(execution_id.clone(), 10000);
+        let buffer = ExecutionBuffer::new(10000);
         self.execution_buffers
             .insert(execution_id.clone(), buffer.clone());
 
