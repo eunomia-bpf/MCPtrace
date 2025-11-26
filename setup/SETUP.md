@@ -58,6 +58,9 @@ sudo apt-get install bpftrace
 
 # Install bpftrace (Fedora)
 sudo dnf install bpftrace
+
+# Install bpftrace (openSUSE)
+sudo zypper install bpftrace
 ```
 
 ### 4. Restart Claude Desktop
