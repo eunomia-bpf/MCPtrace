@@ -37,6 +37,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 sudo apt-get install bpftrace  # Ubuntu/Debian
 # or
 sudo dnf install bpftrace      # Fedora
+# or
+sudo zypper install bpftrace   # openSUSE
 ```
 
 ### Install from crates.io (Recommended)
