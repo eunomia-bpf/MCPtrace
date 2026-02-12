@@ -21,7 +21,6 @@ use tokio::{
     sync::Mutex,
     time::sleep,
 };
-use tracing::info;
 use uuid::Uuid;
 
 type McpError = rmcp::model::ErrorData;
@@ -518,13 +517,13 @@ async fn main() -> Result<()> {
     // Load .env file
     dotenv::dotenv().ok();
     
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("bpftrace_mcp_server=info".parse()?)
-                .add_directive("rmcp=info".parse()?),
-        )
-        .init();
+    // Only initialize logging if RUST_LOG is explicitly set
+    // MCP servers should not write to stdout as it interferes with protocol communication
+    if std::env::var("RUST_LOG").is_ok() {
+        tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .init();
+    }
 
     // Get password from environment variable
     let sudo_password = match std::env::var("BPFTRACE_PASSWD") {
@@ -540,9 +539,11 @@ async fn main() -> Result<()> {
     
     let server = BpftraceServer::new(sudo_password);
     
-    info!("Starting bpftrace MCP server on stdio");
+    // Don't log to stdout as it interferes with MCP protocol communication
+    // info!("Starting bpftrace MCP server on stdio");
     
     let service = server.serve(stdio()).await.inspect_err(|e| {
+        // tracing::error! is a no-op if logging wasn't initialized
         tracing::error!("serving error: {:?}", e);
     })?;
 
