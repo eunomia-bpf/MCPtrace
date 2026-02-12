@@ -543,7 +543,7 @@ async fn main() -> Result<()> {
     // info!("Starting bpftrace MCP server on stdio");
     
     let service = server.serve(stdio()).await.inspect_err(|e| {
-        // Only log errors if RUST_LOG is set (logging was initialized)
+        // tracing::error! is a no-op if logging wasn't initialized
         tracing::error!("serving error: {:?}", e);
     })?;
 
